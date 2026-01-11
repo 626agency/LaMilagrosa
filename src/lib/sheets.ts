@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 
-const SPREADSHEET_ID = '1yfpD2fkIM_DbTwK-SQQ16UqW_HiCTqBd6SBQMzV7UBM';
+const SPREADSHEET_ID = process.env.NEXT_PUBLIC_SPREADSHEET_ID || '1yfpD2fkIM_DbTwK-SQQ16UqW_HiCTqBd6SBQMzV7UBM';
 
 export interface InventarioItem {
     Especie: string;
