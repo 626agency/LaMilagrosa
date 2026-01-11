@@ -90,6 +90,8 @@ export default function DashboardPage() {
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [activeTab, setActiveTab] = useState('dashboard');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
+    const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
     const router = useRouter();
 
     const fetchData = async (isManual = false) => {
@@ -337,7 +339,7 @@ export default function DashboardPage() {
                             gap: '1.5rem',
                             marginBottom: '3rem'
                         }}>
-                            {inventario.filter(i => ['Vacas', 'Toros', 'Caballos', 'Perros', 'Yeguas', 'Perras', 'Mulas'].includes(i.Especie)).map((item, idx) => (
+                            {inventario.map((item, idx) => (
                                 <div key={idx} className="premium-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>{item.Especie}</p>
@@ -393,7 +395,6 @@ export default function DashboardPage() {
                                     <PieChart>
                                         <Pie
                                             data={inventario
-                                                .filter(i => ['Vacas', 'Toros', 'Caballos', 'Perros', 'Yeguas', 'Perras', 'Mulas'].includes(i.Especie))
                                                 .map(i => {
                                                     const clean = i['Cantidad total'].replace(/[^0-9,.]/g, '');
                                                     const lastComma = clean.lastIndexOf(',');
@@ -475,19 +476,56 @@ export default function DashboardPage() {
                 {activeTab === 'gastos' && (
                     <div className="premium-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                            <h2>Registro de Gastos</h2>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <h2>Registro de Gastos</h2>
+                                <select
+                                    value={filterMonth}
+                                    onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+                                    style={{ padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                                >
+                                    <option value={0}>Todos los meses</option>
+                                    <option value={1}>Enero</option>
+                                    <option value={2}>Febrero</option>
+                                    <option value={3}>Marzo</option>
+                                    <option value={4}>Abril</option>
+                                    <option value={5}>Mayo</option>
+                                    <option value={6}>Junio</option>
+                                    <option value={7}>Julio</option>
+                                    <option value={8}>Agosto</option>
+                                    <option value={9}>Septiembre</option>
+                                    <option value={10}>Octubre</option>
+                                    <option value={11}>Noviembre</option>
+                                    <option value={12}>Diciembre</option>
+                                </select>
+                                <select
+                                    value={filterYear}
+                                    onChange={(e) => setFilterYear(parseInt(e.target.value))}
+                                    style={{ padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                                >
+                                    <option value={0}>Todos los años</option>
+                                    <option value={2024}>2024</option>
+                                    <option value={2025}>2025</option>
+                                    <option value={2026}>2026</option>
+                                </select>
+                            </div>
                             <div style={{ fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--color-primary)' }}>
-                                Total: {gastos.reduce((acc, curr) => {
-                                    const val = curr.Total;
-                                    const clean = val.replace(/[^0-9,.]/g, '');
-                                    const lastComma = clean.lastIndexOf(',');
-                                    const lastDot = clean.lastIndexOf('.');
-                                    let parsed = 0;
-                                    if (lastComma > lastDot) parsed = parseFloat(clean.replace(/\./g, '').replace(',', '.'));
-                                    else if (lastDot > lastComma) parsed = parseFloat(clean.replace(/,/g, ''));
-                                    else parsed = parseFloat(clean.replace(',', '.'));
-                                    return acc + (parsed || 0);
-                                }, 0).toLocaleString()}
+                                Total: {gastos
+                                    .filter(g => {
+                                        const [d, m, y] = g['Fecha compra'].split('/').map(n => parseInt(n));
+                                        if (filterMonth !== 0 && m !== filterMonth) return false;
+                                        if (filterYear !== 0 && y !== filterYear) return false;
+                                        return true;
+                                    })
+                                    .reduce((acc, curr) => {
+                                        const clean = curr.Total.replace(/[^0-9,.]/g, '');
+                                        const lastComma = clean.lastIndexOf(',');
+                                        const lastDot = clean.lastIndexOf('.');
+                                        let parsed = 0;
+                                        if (lastComma > lastDot) parsed = parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+                                        else if (lastDot > lastComma) parsed = parseFloat(clean.replace(/,/g, ''));
+                                        else parsed = parseFloat(clean.replace(',', '.'));
+                                        return acc + (parsed || 0);
+                                    }, 0).toLocaleString()}
                             </div>
                         </div>
                         <div className="scroll-x-auto">
@@ -501,14 +539,21 @@ export default function DashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {gastos.map((item, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid var(--color-background)' }}>
-                                            <td style={{ padding: '1rem', fontWeight: '600' }}>{item.Producto}</td>
-                                            <td style={{ padding: '1rem' }}>{item.Cantidad}</td>
-                                            <td style={{ padding: '1rem' }}>{item['Fecha compra']}</td>
-                                            <td style={{ padding: '1rem', fontWeight: 'bold' }}>{item.Total}</td>
-                                        </tr>
-                                    ))}
+                                    {gastos
+                                        .filter(g => {
+                                            const [d, m, y] = g['Fecha compra'].split('/').map(n => parseInt(n));
+                                            if (filterMonth !== 0 && m !== filterMonth) return false;
+                                            if (filterYear !== 0 && y !== filterYear) return false;
+                                            return true;
+                                        })
+                                        .map((item, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid var(--color-background)' }}>
+                                                <td style={{ padding: '1rem', fontWeight: '600' }}>{item.Producto}</td>
+                                                <td style={{ padding: '1rem' }}>{item.Cantidad}</td>
+                                                <td style={{ padding: '1rem' }}>{item['Fecha compra']}</td>
+                                                <td style={{ padding: '1rem', fontWeight: 'bold' }}>{item.Total}</td>
+                                            </tr>
+                                        ))}
                                 </tbody>
                             </table>
                         </div>

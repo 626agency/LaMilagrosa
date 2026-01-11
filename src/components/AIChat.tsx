@@ -28,26 +28,37 @@ export default function AIChat({ data }: { data: { inventario: any[], gastos: an
             // Helper to clean total strings (handles $1.000.000,00 and $1,000,000.00)
             const cleanNumber = (val: string | undefined) => {
                 if (!val) return 0;
-                // Remove currency symbols, spaces, and other non-numeric chars except , and .
+                // Remove currency symbols and spaces
                 let clean = val.replace(/[^0-9,.]/g, '');
 
-                // Identify if it's Spanish (1.234,56) or English (1,234.56)
-                const lastComma = clean.lastIndexOf(',');
-                const lastDot = clean.lastIndexOf('.');
+                const partsComma = clean.split(',');
+                const partsDot = clean.split('.');
 
-                if (lastComma > lastDot) {
-                    // Spanish format: 1.234.567,89
-                    // Remove all dots (thousands), replace comma with dot (decimal)
-                    clean = clean.replace(/\./g, '').replace(',', '.');
-                } else if (lastDot > lastComma) {
-                    // English format: 1,234,567.89
-                    // Remove all commas (thousands)
-                    clean = clean.replace(/,/g, '');
-                } else {
-                    // No mix of comma and dot, or only one type.
-                    // If it's just 1.234 or 1,234, we need to guess if it's thousands or decimal.
-                    // Usually if there are 3 digits after, it's thousands.
-                    if (clean.includes(',')) clean = clean.replace(',', '.');
+                // Logic: In Spanish 1.250,50 / In English 1,250.50
+                // If there's both , and . - identified by order
+                if (clean.includes(',') && clean.includes('.')) {
+                    if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
+                        // Spanish: 1.250,50 -> replace . with nothing, then , with .
+                        return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+                    } else {
+                        // English: 1,250.50 -> replace , with nothing
+                        return parseFloat(clean.replace(/,/g, '')) || 0;
+                    }
+                }
+
+                // If only one separator exists
+                if (clean.includes(',')) {
+                    // If more than 2 digits after comma, it's likely a thousands separator: 1,250
+                    // If exactly 2 digits, could be decimal or thousands. We'll check if it's the ONLY comma.
+                    const afterSeparator = clean.split(',').pop() || '';
+                    if (afterSeparator.length === 3) return parseFloat(clean.replace(/,/g, '')) || 0;
+                    return parseFloat(clean.replace(',', '.')) || 0;
+                }
+
+                if (clean.includes('.')) {
+                    const afterSeparator = clean.split('.').pop() || '';
+                    if (afterSeparator.length === 3) return parseFloat(clean.replace(/\./g, '')) || 0;
+                    return parseFloat(clean) || 0;
                 }
 
                 return parseFloat(clean) || 0;
@@ -69,6 +80,12 @@ export default function AIChat({ data }: { data: { inventario: any[], gastos: an
                 return { d, m, y };
             };
 
+            // NEW: Check for species in Inventario dynamically
+            const matchingSpecies = data.inventario.find(i =>
+                lowerInput.includes(i.Especie.toLowerCase().slice(0, -1)) || // match singular
+                lowerInput.includes(i.Especie.toLowerCase()) // match plural/exact
+            );
+
             // NEW: Check for specific products in Gastos (e.g., "cantinas", "heno")
             const mentionedProduct = data.gastos.find(g => lowerInput.includes(g.Producto.toLowerCase()));
 
@@ -82,32 +99,17 @@ export default function AIChat({ data }: { data: { inventario: any[], gastos: an
 
                 response = `Se han comprado un total de ${totalQty} unidades de ${mentionedProduct.Producto}, con una inversión total de $${totalCost.toLocaleString()}.`;
                 currentTopic = 'gastos';
-            } else if (lowerInput.includes('vacas') || lowerInput.includes('vaca')) {
-                currentTopic = 'vacas';
-                const item = data.inventario.find(i => i.Especie === 'Vacas');
-                response = item ? `Tenemos ${item['Cantidad total']} vacas en total. Hay ${item['Cantidad embarazadas']} embarazadas.` : "No veo vacas.";
-            } else if (lowerInput.includes('toro')) {
-                currentTopic = 'toros';
-                const item = data.inventario.find(i => i.Especie === 'Toros');
-                response = item ? `Hay ${item['Cantidad total']} toros registrados.` : "No hay toros registrados.";
-            } else if (lowerInput.includes('caballo') || lowerInput.includes('yegua')) {
-                currentTopic = 'equinos';
-                const horses = data.inventario.find(i => i.Especie === 'Caballos');
-                const mares = data.inventario.find(i => i.Especie === 'Yeguas');
-                response = `El inventario equino tiene ${horses?.['Cantidad total'] || 0} caballos y ${mares?.['Cantidad total'] || 0} yeguas.`;
-            } else if (lowerInput.includes('perro') || lowerInput.includes('perra')) {
-                currentTopic = 'perros';
-                const dogs = data.inventario.find(i => i.Especie === 'Perros');
-                const p = data.inventario.find(i => i.Especie === 'Perras');
-                response = `Tenemos ${dogs?.['Cantidad total'] || 0} perros y ${p?.['Cantidad total'] || 0} perras.`;
-            } else if (lowerInput.includes('mula')) {
-                currentTopic = 'mulas';
-                const item = data.inventario.find(i => i.Especie === 'Mulas');
-                const total = item ? cleanNumber(item['Cantidad total']) : 0;
-                response = total > 0 ? `Tenemos ${total} mulas registradas en el inventario.` : "No encontré mulas registradas en el inventario.";
+            } else if (matchingSpecies) {
+                currentTopic = 'inventario';
+                const total = matchingSpecies['Cantidad total'];
+                const preg = matchingSpecies['Cantidad embarazadas'];
+                response = `En el inventario de ${matchingSpecies.Especie.toLowerCase()} tenemos ${total} en total. `;
+                if (preg !== '0') {
+                    response += `Hay ${preg} registradas como embarazadas.`;
+                }
             } else if (hasGestation) {
                 const total = data.inventario.reduce((acc, curr) => acc + cleanNumber(curr['Cantidad embarazadas']), 0);
-                response = `En total hay ${total} animales en gestación.`;
+                response = `En total hay ${total} animales en gestación en toda la finca.`;
             } else if (hasGasto || (isVagueFollowUp && currentTopic === 'gastos')) {
                 currentTopic = 'gastos';
 
@@ -117,22 +119,43 @@ export default function AIChat({ data }: { data: { inventario: any[], gastos: an
                 // Extract years from input (e.g. "2025", "2026")
                 const yearMatches = lowerInput.match(/20\d{2}/g);
 
-                if (lowerInput.includes('mes')) {
-                    filteredGastos = data.gastos.filter(g => {
-                        const d = parseSheetDate(g['Fecha compra']);
-                        return d.m === currentMonth && d.y === currentYear;
-                    });
-                    messagePrefix = "Para este mes, los gastos suman";
+                const months = {
+                    enero: 1, febrer: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+                    julio: 7, agosto: 8, septiemb: 9, octubr: 10, noviemb: 11, diciemb: 12
+                };
+
+                let targetMonth = currentMonth;
+                let targetYear = currentYear;
+                let isFiltered = false;
+
+                // Detect exact month name
+                Object.entries(months).forEach(([name, num]) => {
+                    if (lowerInput.includes(name)) {
+                        targetMonth = num;
+                        isFiltered = true;
+                    }
+                });
+
+                if (lowerInput.includes('mes') && !isFiltered) {
+                    isFiltered = true;
                 } else if (yearMatches && yearMatches.length > 0) {
-                    const selectedYears = yearMatches.map(y => parseInt(y));
-                    filteredGastos = data.gastos.filter(g => selectedYears.includes(parseSheetDate(g['Fecha compra']).y));
-                    messagePrefix = `Para el periodo solicitado, el total es`;
+                    targetYear = parseInt(yearMatches[0]);
+                    isFiltered = true;
                 } else if (lowerInput.includes('año')) {
+                    isFiltered = true;
+                    targetMonth = -1; // Flag for full year
+                }
+
+                if (isFiltered) {
                     filteredGastos = data.gastos.filter(g => {
                         const d = parseSheetDate(g['Fecha compra']);
-                        return d.y === currentYear;
+                        if (targetMonth === -1) return d.y === targetYear;
+                        return d.m === targetMonth && d.y === targetYear;
                     });
-                    messagePrefix = "En lo que va del año, los gastos suman";
+
+                    const monthText = targetMonth === -1 ? `todo el ${targetYear}` :
+                        Object.keys(months).find(name => months[name as keyof typeof months] === targetMonth) || "este mes";
+                    messagePrefix = `Para ${monthText}, los gastos suman`;
                 }
 
                 const total = filteredGastos.reduce((acc, curr) => acc + cleanNumber(curr.Total), 0);
