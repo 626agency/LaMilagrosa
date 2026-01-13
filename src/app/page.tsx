@@ -28,10 +28,10 @@ export default function LandingPage() {
         `}} />
         <div style={{ marginBottom: "2rem" }}>
           <Image
-            src="/new-logo-la-milagrosa.png"x
+            src="/new-logo-la-milagrosa.png"
             alt="La Milagrosa Logo"
-            width={200}
-            height={200}
+            width={300}
+            height={300}
             style={{ objectFit: "contain" }}
           />
         </div>
