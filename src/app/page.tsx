@@ -28,11 +28,11 @@ export default function LandingPage() {
         `}} />
         <div style={{ marginBottom: "2rem" }}>
           <Image
-            src="/logo-la-milagrosa.jpg"
+            src="/new-logo-la-milagrosa.png"x
             alt="La Milagrosa Logo"
-            width={160}
-            height={160}
-            style={{ borderRadius: "50%", border: "4px solid var(--color-accent)" }}
+            width={200}
+            height={200}
+            style={{ objectFit: "contain" }}
           />
         </div>
         <h1 className="hero-title" style={{ color: "white", fontSize: "4rem", marginBottom: "1rem" }}>Criadero La Milagrosa</h1>
